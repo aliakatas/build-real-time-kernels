@@ -210,3 +210,4 @@ Linux box 6.18.33+rpt-rpi-v8 #1 SMP PREEMPT Debian 1:6.18.33-1+rpt1 (2026-06-01)
 Linux box 6.12.92-rt18-v8+ #1 SMP PREEMPT_RT Mon Jun  8 19:02:46 BST 2026 aarch64 GNU/Linux
 ```
 
+###### Notes: see Raspberry Pi Linux kernel on [Github](https://github.com/raspberrypi/linux).
