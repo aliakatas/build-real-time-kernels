@@ -102,102 +102,105 @@ A Ryzen 9 Pro 6950H took about 11 minutes with all 16 cores engaged.
 ## 6. Install the Files
 
 Once the build finishes, there are two ways to transfer the kernel to the Pi.
-1. By plugging the Raspberry Pi's MicroSD card into the build machine. 
-   Identify the mount points:
-      - Boot partition: (often mounted at `/media/$USER/boot-fs/` or `/media/$USER/firmware/`)
-      - Root partition: (often mounted at `/media/$USER/rootfs/`)
-    Run the following commands to copy the newly built modules and kernel images over (make sure to replace paths with the actual mount paths):
-    ```bash
-    # Install Kernel Modules (to the root partition):
-    sudo ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make modules_install INSTALL_MOD_PATH=/media/$USER/rootfs/
 
-    # Copy the Kernel Image and Device Tree Blobs (to the boot partition):
-    # Copy the main kernel image under our custom name
-    sudo cp arch/arm64/boot/Image /media/$USER/firmware/kernel8-rt.img
+### 6.1. By plugging the Raspberry Pi's MicroSD card into the build machine. 
+Identify the mount points:
+   - Boot partition: (often mounted at `/media/$USER/boot-fs/` or `/media/$USER/firmware/`)
+   - Root partition: (often mounted at `/media/$USER/rootfs/`)
+ Run the following commands to copy the newly built modules and kernel images over (make sure to replace paths with the actual mount paths):
+ ```bash
+ # Install Kernel Modules (to the root partition):
+ sudo ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- make modules_install INSTALL_MOD_PATH=/media/$USER/rootfs/
 
-    # Copy overlays and base hardware DTBs
-    sudo cp arch/arm64/boot/dts/broadcom/*.dtb /media/$USER/firmware/
-    sudo cp arch/arm64/boot/dts/overlays/*.dtbo /media/$USER/firmware/overlays/
-    ```
-2. By copying over SSH.
-   Open a terminal in the `rpi-kernel/linux` directory and copy the files over to the Pi's temporary directory (`/tmp`). 
-   Then move them into place on the Pi.
-   ```bash
-   # Copy the kernel image
-   scp arch/arm64/boot/Image ${USER}$@raspberrypi.local:/tmp/kernel8-rt.img
-   
-   # Copy the device tree blobs
-   scp arch/arm64/boot/dts/broadcom/*.dtb ${USER}@raspberrypi.local:/tmp/
-   ```
+ # Copy the Kernel Image and Device Tree Blobs (to the boot partition):
+ # Copy the main kernel image under our custom name
+ sudo cp arch/arm64/boot/Image /media/$USER/firmware/kernel8-rt.img
 
-   Because overlays go into a specific subfolder, it's easiest to compress them first, send them over, and extract them on the Pi.
-   ```bash
-   # 1. Move directly into the directory where the compiled overlays are
-   cd arch/arm/boot/dts/
-   
-   # 2. Create the tarball from right inside this folder
-   tar -czf ../../../../overlays.tar.gz overlays/
-   
-   # 3. Jump back to your main linux build root directory
-   cd ../../../../
-   
-   # Send the tarball to the Pi
-   scp overlays.tar.gz ${USER}@raspberrypi.local:/tmp/
-   ```
-   
-   Kernel modules consist of hundreds of tiny files. Copying them one by one over SSH is incredibly slow. 
-   Instead, install them into a temporary local folder on the build PC, zip them up, and transfer them as one file.
-   ```bash
-   # 0. Define vars for convenience
-   cwd=`(pwd)`
-   target_dir=/tmp/pi-modules
+ # Copy overlays and base hardware DTBs
+ sudo cp arch/arm64/boot/dts/broadcom/*.dtb /media/$USER/firmware/
+ sudo cp arch/arm64/boot/dts/overlays/*.dtbo /media/$USER/firmware/overlays/
+ ```
 
-   # 1. Create a temporary folder on your PC
-   mkdir -p ${target_dir}
-   
-   # 2. Install modules locally into that folder
-   make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=${target_dir}
-   
-   # 3. Compress them
-   cd ${target_dir}/lib
-   tar -czf ${cwd}/modules.tar.gz modules/
-   cd ${cwd}
-   
-   # 4. Send the tarball to the Pi
-   scp modules.tar.gz ${USER}@raspberrypi.local:/tmp/
+### 6.2. By copying over SSH.
+Open a terminal in the `rpi-kernel/linux` directory and copy the files over to the Pi's temporary directory (`/tmp`). 
+Then move them into place on the Pi.
+```bash
+# Copy the kernel image
+scp arch/arm64/boot/Image ${USER}$@raspberrypi.local:/tmp/kernel8-rt.img
 
-   # 5. clean up
-   rm -rf /tmp/pi-modules
-   ```
-   
-   Log into the Raspberry Pi via SSH and proceed with unpacking and moving everything to their final production destinations.
-   ```bash
-   # 1. Move the kernel image to the boot firmware directory
-   sudo mv /tmp/kernel8-rt.img /boot/firmware/
-   
-   # 2. Move the base DTB files
-   sudo cp /tmp/*.dtb /boot/firmware/
-   
-   # 3. Extract the overlays into the firmware folder
-   sudo tar -xzf /tmp/overlays.tar.gz -C /boot/firmware/
-   
-   # 4. Extract the kernel modules into the system modules folder
-   sudo tar -xzf /tmp/modules.tar.gz -C /lib/
-   
-   # 5. Clean up the temporary files on the Pi
-   rm /tmp/*.dtb /tmp/overlays.tar.gz /tmp/modules.tar.gz
-   ```
+# Copy the device tree blobs
+scp arch/arm64/boot/dts/broadcom/*.dtb ${USER}@raspberrypi.local:/tmp/
+```
 
-   Now, update `config.txt` and reboot.
-   ```bash
-   sudo vi /boot/firmware/config.txt
-   ```
+Because overlays go into a specific subfolder, it's easiest to compress them first, send them over, and extract them on the Pi.
+```bash
+# 1. Move directly into the directory where the compiled overlays are
+cd arch/arm/boot/dts/
 
-   Add the line pointing to the new kernel:
-   ```
-   kernel=kernel8-rt.img
-   ```
-   Save, exit, and safely trigger the reboot.
+# 2. Create the tarball from right inside this folder
+tar -czf ../../../../overlays.tar.gz overlays/
+
+# 3. Jump back to your main linux build root directory
+cd ../../../../
+
+# Send the tarball to the Pi
+scp overlays.tar.gz ${USER}@raspberrypi.local:/tmp/
+```
+
+Kernel modules consist of hundreds of tiny files. Copying them one by one over SSH is incredibly slow. 
+Instead, install them into a temporary local folder on the build PC, zip them up, and transfer them as one file.
+```bash
+# 0. Define vars for convenience
+cwd=`(pwd)`
+target_dir=/tmp/pi-modules
+
+# 1. Create a temporary folder on your PC
+mkdir -p ${target_dir}
+
+# 2. Install modules locally into that folder
+make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- modules_install INSTALL_MOD_PATH=${target_dir}
+
+# 3. Compress them
+cd ${target_dir}/lib
+tar -czf ${cwd}/modules.tar.gz modules/
+cd ${cwd}
+
+# 4. Send the tarball to the Pi
+scp modules.tar.gz ${USER}@raspberrypi.local:/tmp/
+
+# 5. clean up
+rm -rf /tmp/pi-modules
+```
+--------
+Log into the Raspberry Pi via SSH or insert the MicroSD card and power up the device.
+Then, proceed with unpacking and moving everything to their final production destinations.
+```bash
+# 1. Move the kernel image to the boot firmware directory
+sudo mv /tmp/kernel8-rt.img /boot/firmware/
+   
+# 2. Move the base DTB files
+sudo cp /tmp/*.dtb /boot/firmware/
+
+# 3. Extract the overlays into the firmware folder
+sudo tar -xzf /tmp/overlays.tar.gz -C /boot/firmware/
+
+# 4. Extract the kernel modules into the system modules folder
+sudo tar -xzf /tmp/modules.tar.gz -C /lib/
+
+# 5. Clean up the temporary files on the Pi
+rm /tmp/*.dtb /tmp/overlays.tar.gz /tmp/modules.tar.gz
+```
+
+Now, update `config.txt` and reboot.
+```bash
+sudo vi /boot/firmware/config.txt
+```
+
+Add the line pointing to the new kernel:
+```
+kernel=kernel8-rt.img
+```
+Save, exit, and safely trigger the reboot.
 
 After rebooting, confirm the new kernel is active with:
 ```bash
